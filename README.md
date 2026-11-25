@@ -1,0 +1,1 @@
+I designed and implemented this Python-based feature extraction pipeline for my UWB LOS/NLOS identification research. My contributions included CIR preprocessing, peak detection, keypoint extraction, and Voronoi-based feature generation, transforming 1D CIR signals into 32×32 representations for CNN-BiLSTM classification.
