@@ -1,0 +1,78 @@
+
+import numpy as np
+from scipy.signal import find_peaks
+from scipy.spatial import Voronoi
+
+# Extract CIR data (1016-dimensional time series)
+cir_values = df.iloc[:, -1016:].values
+
+# Define the time axis corresponding to the CIR samples
+time_axis = np.arange(1016)
+
+# Convert complex-valued CIR samples into their magnitudes
+cir_values = np.abs(cir_values)
+cir_values = cir_values.astype(np.float32)
+
+# Normalize CIR amplitudes to the range [0, 1]
+cir_values = (cir_values - cir_values.min()) / (
+    cir_values.max() - cir_values.min()
+)
+
+# Extract keypoints from each CIR sample for Voronoi feature construction
+voronoi_points = []
+
+for i in range(len(cir_values)):
+
+    # Detect all local peaks above the specified amplitude threshold
+    peaks, _ = find_peaks(cir_values[i], height=0.1)
+
+    # Represent each peak using its time index and amplitude
+    key_points = np.column_stack(
+        (time_axis[peaks], cir_values[i][peaks])
+    )
+
+    voronoi_points.append(key_points)
+
+# Store the extracted keypoints for all CIR samples
+voronoi_points = np.array(voronoi_points, dtype=object)
+
+
+# Generate a 2D Voronoi-based feature representation from keypoints
+def compute_voronoi_features(points, size=(32, 32)):
+
+    # Return an empty feature matrix if there are insufficient keypoints
+    if len(points) < 4:
+        return np.zeros(size)
+
+    # Construct the Voronoi diagram based on the extracted keypoints
+    vor = Voronoi(points)
+
+    # Initialize a binary feature matrix
+    feature_matrix = np.zeros(size)
+
+    # Iterate over all Voronoi regions
+    for region in vor.regions:
+
+        # Skip empty regions and unbounded regions
+        if not region or -1 in region:
+            continue
+
+        # Retrieve the vertices defining the current Voronoi region
+        vertices = np.array([vor.vertices[i] for i in region])
+
+        # Calculate the centroid of the Voronoi region
+        centroid = np.mean(vertices, axis=0)
+
+        # Map the centroid coordinates to the 32 x 32 feature matrix
+        x = int(centroid[0] / 1016 * (size[0] - 1))
+        y = int(centroid[1] * (size[1] - 1))
+
+        # Ensure the mapped coordinates are within matrix boundaries
+        x = np.clip(x, 0, size[0] - 1)
+        y = np.clip(y, 0, size[1] - 1)
+
+        # Mark the corresponding position in the feature matrix
+        feature_matrix[x, y] = 1
+
+    return feature_matrix
+
